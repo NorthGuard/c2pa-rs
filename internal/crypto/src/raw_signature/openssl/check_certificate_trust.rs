@@ -44,7 +44,7 @@ pub(crate) fn check_certificate_trust(
     verify_param.set_flags(X509VerifyFlags::X509_STRICT)?;
 
     if let Some(st) = signing_time_epoch {
-        verify_param.set_time(st);
+        verify_param.set_time(st.try_into().unwrap());
     } else {
         verify_param.set_flags(X509VerifyFlags::NO_CHECK_TIME)?;
     }
