@@ -49,7 +49,7 @@ pub(crate) fn check_certificate_trust(
     verify_param.set_flags(X509VerifyFlags::PARTIAL_CHAIN)?; // allow intermediates to be on anchor list
 
     if let Some(st) = signing_time_epoch {
-        verify_param.set_time(st);
+        verify_param.set_time(st.try_into().unwrap());
     } else {
         verify_param.set_flags(X509VerifyFlags::NO_CHECK_TIME)?;
     }
