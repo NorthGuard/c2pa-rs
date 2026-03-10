@@ -237,6 +237,9 @@ pub mod validation_results;
 #[doc(hidden)]
 pub mod validation_status;
 
+/// Merkle tree utilities for C2PA (roots and inclusion proofs from pre-hashed leaves).
+pub mod merkle_utils;
+
 // Public exports
 #[doc(inline)]
 pub use assertions::DigitalSourceType;
@@ -251,6 +254,8 @@ pub use crypto::raw_signature::SigningAlg;
 pub use error::{Error, Result};
 #[doc(hidden)]
 pub use external_manifest::ManifestPatchCallback;
+pub use merkle_utils::{compute_merkle_proof, compute_merkle_root};
+pub use utils::merkle::{C2PAMerkleTree, MerkleNode};
 pub use hash_utils::{hash_stream_by_alg, HashRange};
 pub use hashed_uri::HashedUri;
 pub use ingredient::Ingredient;
