@@ -2132,6 +2132,84 @@ impl AssertionBase for BmffHash {
     }
 }
 
+/// Compute the flat BMFF hash that appears in `c2pa.hash.bmff.v3.data.hash`.
+///
+/// This uses the same default exclusions and hashing pipeline as the C2PA signer, so
+/// the returned bytes are **identical** to `data.hash` in the BMFF hash assertion
+/// embedded by `Builder::save_to_stream`.
+///
+/// ## Important: call on the **signed** output, not the pre-sign input
+///
+/// When the builder embeds the C2PA manifest, the JUMBF UUID box is inserted into the
+/// BMFF file (typically right after `ftyp`).  The BMFF handler then adjusts all
+/// absolute-offset boxes (`stco`, `co64`, …) in `moov` to account for the inserted
+/// bytes.  The flat hash is computed on this *modified* stream with the UUID box
+/// excluded.  Calling this function on the **pre-sign input** will therefore produce a
+/// *different* value than what ends up in `data.hash`.
+///
+/// Typical use cases:
+/// * Post-sign verification: re-derive `data.hash` from the signed asset and compare
+///   with the stored value.
+/// * Signing a two-pass workflow where the asset is signed first, then the flat hash is
+///   DID-signed and re-embedded via an update manifest.
+///
+/// If you need a value that can be DID-signed **before** calling `sign_file`, use
+/// [`compute_bmff_mdat_merkle_roots`] instead (it is computed on the pre-sign stream).
+///
+/// # Arguments
+/// * `reader` – seekable stream for the BMFF asset (the *signed* output file)
+/// * `alg`    – hash algorithm, e.g. `"sha256"` (must match the builder's signing alg)
+pub fn compute_bmff_flat_hash(reader: &mut dyn CAIRead, alg: &str) -> crate::Result<Vec<u8>> {
+    let mut bmff_hash = BmffHash::new("c2pa.hash.bmff", alg, None);
+    bmff_hash.set_default_exclusions();
+    bmff_hash.gen_hash_from_stream(reader)?;
+    bmff_hash
+        .hash()
+        .map(|h| h.to_vec())
+        .ok_or_else(|| Error::BadParam("could not generate BMFF flat hash".to_string()))
+}
+
+/// Compute per-mdat Merkle roots using the same algorithm as the C2PA signer.
+///
+/// Returns one root per `mdat` box, in file order. Delegates to the internal
+/// `create_merkle_tree_for_merkle_map` so the chunking and tree construction
+/// are always in sync with the signing path.
+///
+/// Call on the **pre-sign input** (the signer computes Merkle roots on the
+/// input stream before embedding the manifest).
+///
+/// `chunk_size_kb` must equal `core.merkle_tree_chunk_size_in_kb` in the
+/// builder settings so that the embedded `data.merkle` roots match.
+pub fn compute_bmff_mdat_merkle_roots(
+    reader: &mut dyn CAIRead,
+    chunk_size_kb: usize,
+    alg: &str,
+) -> crate::Result<Vec<Vec<u8>>> {
+    let bmff = BmffHash::new("c2pa.hash.bmff", alg, None);
+    let boxes = read_bmff_c2pa_boxes(reader)?;
+
+    let mut roots = Vec::new();
+    for mdat in boxes.box_infos.iter().filter(|b| b.path == "mdat") {
+        let mut mm = MerkleMap {
+            unique_id: 0,
+            local_id: 0,
+            count: 0,
+            alg: Some(alg.to_string()),
+            init_hash: None,
+            hashes: VecByteBuf(Vec::new()),
+            fixed_block_size: Some(1024 * chunk_size_kb as u64),
+            variable_block_sizes: None,
+        };
+        let tree = bmff.create_merkle_tree_for_merkle_map(reader, mdat, &mut mm)?;
+        let root = tree
+            .get_root()
+            .cloned()
+            .ok_or_else(|| Error::BadParam("empty Merkle tree for mdat".into()))?;
+        roots.push(root);
+    }
+    Ok(roots)
+}
+
 fn stsc_index(track: &Mp4Track, sample_id: u32) -> crate::Result<usize> {
     if track.trak.mdia.minf.stbl.stsc.entries.is_empty() {
         return Err(Error::InvalidAsset("BMFF has no stsc entries".to_string()));

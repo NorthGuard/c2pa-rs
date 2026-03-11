@@ -26,3 +26,15 @@ Commit message: *"Bug fix: Rust type mismatch in c2pa for i686-linux-android."*
 - Re-exported functions at crate root: `compute_merkle_root`, `compute_merkle_proof`.
 
 **Why:** To allow downstream code to compute C2PA Merkle roots and inclusion proofs from pre-hashed leaves using the same algorithm as the SDK, without reimplementing it.
+
+---
+
+## Expose BMFF hash utilities
+
+**What was added:**
+
+- `compute_bmff_flat_hash(reader, alg)` — thin wrapper around `BmffHash::new` + `set_default_exclusions` + `gen_hash_from_stream`. Returns the same flat hash stored in `c2pa.hash.bmff.v3.data.hash`. Must be called on the signed output file.
+- `compute_bmff_mdat_merkle_roots(reader, chunk_size_kb, alg)` — thin wrapper that calls `create_merkle_tree_for_merkle_map` for each mdat box and returns the root. Returns the same roots the signer computes for `c2pa.hash.bmff.v3.data.merkle`. Must be called on the pre-sign input file.
+- Both re-exported at crate root via `assertions::mod.rs`.
+
+**Why:** To allow downstream code (e.g. DID/TEE signing of the Merkle root before calling `sign_file`) to obtain the exact values that the C2PA signer will embed, without reimplementing the hashing or tree construction.

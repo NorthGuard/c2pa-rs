@@ -254,6 +254,7 @@ pub use crypto::raw_signature::SigningAlg;
 pub use error::{Error, Result};
 #[doc(hidden)]
 pub use external_manifest::ManifestPatchCallback;
+pub use assertions::{compute_bmff_flat_hash, compute_bmff_mdat_merkle_roots};
 pub use merkle_utils::{compute_merkle_proof, compute_merkle_root};
 pub use utils::merkle::{C2PAMerkleTree, MerkleNode};
 pub use hash_utils::{hash_stream_by_alg, HashRange};
