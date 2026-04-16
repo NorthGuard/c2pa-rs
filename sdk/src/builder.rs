@@ -784,6 +784,24 @@ impl Builder {
         Ok(self)
     }
 
+    /// Adds a CBOR assertion marked as created (signer-attributed) for Claims V2.
+    ///
+    /// Use this instead of [`add_assertion`] when the assertion originates from this
+    /// generator rather than being gathered from an external source.
+    pub fn add_created_assertion<S, T>(&mut self, label: S, data: &T) -> Result<&mut Self>
+    where
+        S: Into<String>,
+        T: Serialize,
+    {
+        self.definition.assertions.push(AssertionDefinition {
+            label: label.into(),
+            data: AssertionData::Cbor(c2pa_cbor::value::to_value(data)?),
+            kind: None,
+            created: true,
+        });
+        Ok(self)
+    }
+
     /// Adds a JSON assertion to the manifest.
     /// Use only when the assertion must be stored in JSON format.
     ///
@@ -805,6 +823,24 @@ impl Builder {
             data: AssertionData::Json(serde_json::to_value(data)?),
             kind: Some(ManifestAssertionKind::Json),
             created,
+        });
+        Ok(self)
+    }
+
+    /// Adds a JSON assertion marked as created (signer-attributed) for Claims V2.
+    ///
+    /// Use this instead of [`add_assertion_json`] when the assertion originates from
+    /// this generator rather than being gathered from an external source.
+    pub fn add_created_assertion_json<S, T>(&mut self, label: S, data: &T) -> Result<&mut Self>
+    where
+        S: Into<String>,
+        T: Serialize,
+    {
+        self.definition.assertions.push(AssertionDefinition {
+            label: label.into(),
+            data: AssertionData::Json(serde_json::to_value(data)?),
+            kind: Some(ManifestAssertionKind::Json),
+            created: true,
         });
         Ok(self)
     }
