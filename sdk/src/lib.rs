@@ -245,6 +245,7 @@ pub mod merkle_utils;
 pub use assertions::DigitalSourceType;
 #[doc(inline)]
 pub use assertions::Relationship;
+pub use assertions::{compute_bmff_flat_hash, compute_bmff_mdat_merkle_roots};
 pub use builder::{Builder, BuilderIntent, ManifestDefinition};
 pub use callback_signer::{CallbackFunc, CallbackSigner};
 pub use claim_generator_info::ClaimGeneratorInfo;
@@ -254,9 +255,6 @@ pub use crypto::raw_signature::SigningAlg;
 pub use error::{Error, Result};
 #[doc(hidden)]
 pub use external_manifest::ManifestPatchCallback;
-pub use assertions::{compute_bmff_flat_hash, compute_bmff_mdat_merkle_roots};
-pub use merkle_utils::{compute_merkle_proof, compute_merkle_root};
-pub use utils::merkle::{C2PAMerkleTree, MerkleNode};
 pub use hash_utils::{hash_stream_by_alg, HashRange};
 pub use hashed_uri::HashedUri;
 pub use ingredient::Ingredient;
@@ -265,12 +263,14 @@ pub use ingredient::Ingredient;
 pub use ingredient::{DefaultOptions, IngredientOptions};
 pub use manifest::{Manifest, SignatureInfo};
 pub use manifest_assertion::{ManifestAssertion, ManifestAssertionKind};
+pub use merkle_utils::{compute_merkle_proof, compute_merkle_root};
 pub use reader::Reader;
 #[doc(inline)]
 pub use resource_store::{ResourceRef, ResourceStore};
 #[doc(inline)]
 pub use settings::Settings;
 pub use signer::{AsyncSigner, BoxedAsyncSigner, BoxedSigner, Signer};
+pub use utils::merkle::{C2PAMerkleTree, MerkleNode};
 pub use utils::{ephemeral_signer::EphemeralSigner, mime::format_from_path};
 #[doc(inline)]
 pub use validation_results::{ValidationResults, ValidationState};
