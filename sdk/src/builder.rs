@@ -41,6 +41,7 @@ use crate::{
     claim::Claim,
     context::Context,
     crypto::cose,
+    dynamic_assertion::PartialClaim,
     error::{Error, Result},
     jumbf::labels::manifest_label_from_uri,
     jumbf_io,
@@ -2483,14 +2484,28 @@ impl Builder {
         // Build a fresh store from Builder state (contains the real hash assertions).
         let mut store = self.to_store()?;
 
-        // Add dynamic assertion placeholder slots so sign_manifest() will write them.
+        // Dynamic assertions (e.g. cawg.identity) are consumed on the first
+        // `signer.dynamic_assertions()` call. Reserve placeholders and finalize
+        // content here — the same sequence as `Store::save_to_stream` — before
+        // signing; `sign_manifest()` would see an empty list on its own fetch.
         let signer = self.context().signer()?;
         let dynamic_assertions = signer.dynamic_assertions();
         if !dynamic_assertions.is_empty() {
             store.add_dynamic_assertion_placeholders(&dynamic_assertions)?;
+
+            let mut preliminary_claim = PartialClaim::default();
+            {
+                let pc = store.provenance_claim().ok_or(Error::ClaimEncoding)?;
+                for assertion in pc.assertions() {
+                    preliminary_claim.add_assertion(assertion);
+                }
+            }
+            store.write_dynamic_assertions(&dynamic_assertions, &mut preliminary_claim)?;
         }
 
         let mut jumbf = store.sign_manifest(signer, self.context().settings())?;
+        // `sign_manifest` calls `dynamic_assertions()` again; for consume-once
+        // signers (e.g. `IdentityAssertionSigner`) that second fetch is empty by design.
 
         // Mode 1 only: zero-pad the signed JUMBF to match the pre-committed placeholder
         // size so the composed result is byte-for-byte the same length as the composed
@@ -5662,5 +5677,60 @@ mod tests {
 
         let future = builder.sign_async(&signer, "image/jpeg", &mut src, &mut dst);
         assert_send(future);
+    }
+
+    /// `sign_embeddable` must finalize dynamic assertions (not ship zero placeholders).
+    /// Signers such as `IdentityAssertionSigner` consume `dynamic_assertions()` on the
+    /// first call, so finalization cannot be deferred to `sign_manifest()`.
+    #[test]
+    #[cfg(feature = "file_io")]
+    fn test_sign_embeddable_finalizes_dynamic_assertions() -> Result<()> {
+        use crate::utils::test_signer::test_cawg_signer;
+
+        let settings = json!({ "verify": { "verify_after_sign": false } });
+        let signer = test_cawg_signer(SigningAlg::Ps256, &["c2pa.hash.data"])?;
+        let context = Context::new()
+            .with_settings(settings.to_string())?
+            .with_signer(signer);
+
+        let mut builder = Builder::from_context(context)
+            .with_definition(simple_manifest_json().as_str())?;
+
+        let mut dh = DataHash::new("data_hash", "sha256");
+        dh.set_hash(vec![0xAB; 32]);
+        builder.add_assertion(DataHash::LABEL, &dh)?;
+
+        let signed = builder.sign_embeddable("application/c2pa")?;
+
+        const PLACEHOLDER_LEN: usize = 11_510;
+        if signed.len() >= PLACEHOLDER_LEN {
+            for window in signed.windows(PLACEHOLDER_LEN) {
+                assert!(
+                    !window.iter().all(|&b| b == 0),
+                    "signed store must not contain the unfinalized all-zero cawg.identity placeholder"
+                );
+            }
+        }
+
+        let reader = Reader::from_stream("application/c2pa", Cursor::new(signed))?;
+        let active = reader.active_manifest().ok_or(Error::JumbfNotFound)?;
+        let cawg = active
+            .assertions()
+            .iter()
+            .find(|a| a.label() == "cawg.identity" || a.label().starts_with("cawg.identity__"))
+            .ok_or(Error::NotFound)?;
+
+        match cawg.binary() {
+            Ok(bytes) => assert!(
+                bytes.iter().any(|b| *b != 0),
+                "cawg.identity must be finalized CBOR, not an all-zero placeholder"
+            ),
+            Err(_) => {
+                let value = cawg.value()?;
+                assert!(!value.is_null(), "cawg.identity must decode to non-null CBOR");
+            }
+        }
+
+        Ok(())
     }
 }

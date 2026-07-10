@@ -2755,7 +2755,7 @@ impl Store {
         preliminary_claim: &mut PartialClaim,
     ))]
     #[allow(unused_variables)]
-    fn write_dynamic_assertions(
+    pub(crate) fn write_dynamic_assertions(
         &mut self,
         dyn_assertions: &[Box<dyn DynamicAssertion>],
         preliminary_claim: &mut PartialClaim,
