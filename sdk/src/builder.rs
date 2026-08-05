@@ -5693,8 +5693,8 @@ mod tests {
             .with_settings(settings.to_string())?
             .with_signer(signer);
 
-        let mut builder = Builder::from_context(context)
-            .with_definition(simple_manifest_json().as_str())?;
+        let mut builder =
+            Builder::from_context(context).with_definition(simple_manifest_json().as_str())?;
 
         let mut dh = DataHash::new("data_hash", "sha256");
         dh.set_hash(vec![0xAB; 32]);
@@ -5727,7 +5727,10 @@ mod tests {
             ),
             Err(_) => {
                 let value = cawg.value()?;
-                assert!(!value.is_null(), "cawg.identity must decode to non-null CBOR");
+                assert!(
+                    !value.is_null(),
+                    "cawg.identity must decode to non-null CBOR"
+                );
             }
         }
 
